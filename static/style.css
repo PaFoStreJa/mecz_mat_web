@@ -1,0 +1,136 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #1e1e2f, #12121a);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    color: #f0f0f0;
+}
+
+.login-container {
+    background: rgba(40, 40, 55, 0.9);
+    backdrop-filter: blur(8px);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    width: 90%;
+    max-width: 400px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.login-form h1 {
+    margin-bottom: 20px;
+    text-align: center;
+    color: #ffffff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.login-form input {
+    padding: 12px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 12px;
+    background-color: #2b2b3d;
+    color: #ffffff;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.login-form input::placeholder {
+    color: #aaa;
+}
+
+.login-form input:focus {
+    outline: none;
+    background-color: #3b3b50;
+}
+
+.login-form button {
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    background-color: #4f78ff;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.login-form button:hover {
+    background-color: #345ee0;
+}
+
+.error {
+    background-color: #ff4c4c20;
+    color: #ff9999;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    text-align
+
+/* Dashboard – kontener ogólny */
+.dashboard-container {
+  background: rgba(40, 40, 55, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  width: 90%;
+  max-width: 600px;
+  text-align: center;
+}
+
+/* Tytuł powitalny */
+.dashboard-title {
+  font-size: 2rem;
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+/* Podtytuł np. rola */
+.dashboard-subtitle {
+  color: #cccccc;
+  margin-bottom: 20px;
+}
+
+/* Składnik skanera QR */
+.qr-scanner {
+  width: 100%;
+  max-width: 400px;
+  margin: 20px auto;
+  border: 2px solid #333;
+  border-radius: 15px;
+  overflow: hidden;
+}
+
+/* Wynik QR kodu */
+.qr-result {
+  margin-top: 15px;
+  font-size: 1rem;
+  color: #00c853;
+}
+
+/* Przycisk wyloguj */
+.logout-button {
+  margin-top: 25px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 12px;
+  background-color: #4f78ff;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.logout-button:hover {
+  background-color: #345ee0;
+}

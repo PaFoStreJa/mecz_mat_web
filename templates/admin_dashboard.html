@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Panel Admina</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
+    <style>
+      #map {
+        height: 60vh;
+        width: 100%;
+        border-radius: 15px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+        border: 2px solid #333;
+        margin-top: 20px;
+      }
+
+      .leaflet-popup-content-wrapper {
+        background: #222;
+        color: #eee;
+        border-radius: 8px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+      }
+
+      .leaflet-popup-tip {
+        background: #222;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <h1 class="dashboard-title">Witaj, {{ username }} (Admin)</h1>
+      <p class="dashboard-subtitle">Poniżej znajduje się lokalizacja graczy:</p>
+      <div id="map"></div>
+      <button class="logout-button" onclick="window.location.href='/'">
+        Wyloguj
+      </button>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+    <script>
+      const map = L.map("map").setView([52.237, 21.017], 6); // Polska środek
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+      }).addTo(map);
+
+      let markers = {};
+
+      async function fetchLocations() {
+        try {
+          const res = await fetch("/get_locations");
+          if (!res.ok) {
+            console.error("Błąd pobierania lokalizacji");
+            return;
+          }
+          const data = await res.json();
+
+          for (const user in markers) {
+            if (!data[user]) {
+              map.removeLayer(markers[user]);
+              delete markers[user];
+            }
+          }
+
+          for (const [username, loc] of Object.entries(data)) {
+            const latlng = [loc.latitude, loc.longitude];
+            if (markers[username]) {
+              markers[username].setLatLng(latlng);
+            } else {
+              markers[username] = L.marker(latlng)
+                .addTo(map)
+                .bindPopup(`<b>${username}</b>`);
+            }
+          }
+        } catch (error) {
+          console.error("Błąd sieciowy:", error);
+        }
+      }
+
+      fetchLocations();
+      setInterval(fetchLocations, 10000);
+    </script>
+  </body>
+</html>

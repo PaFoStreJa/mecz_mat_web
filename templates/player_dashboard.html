@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gracz – Panel</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <script
+      src="https://unpkg.com/html5-qrcode"
+      type="text/javascript"
+    ></script>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <h1 class="dashboard-title">Witaj, {{ username }}!</h1>
+      <p class="dashboard-subtitle">
+        Jesteś zalogowany jako <strong>gracz</strong>.
+      </p>
+
+      <div id="reader" class="qr-scanner"></div>
+      <div id="qr-result" class="qr-result">
+        Oczekiwanie na skanowanie kodu QR...
+      </div>
+
+      <button onclick="window.location.href='/'" class="logout-button">
+        Wyloguj
+      </button>
+    </div>
+
+    <script>
+      // Wysyłanie lokalizacji
+      function sendLocation(lat, lon) {
+        fetch("/update_location", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ latitude: lat, longitude: lon }),
+        })
+          .then((res) => res.json())
+          .then((data) => console.log("Location sent:", data))
+          .catch((err) => console.error("Location error:", err));
+      }
+
+      function requestAndSendLocation() {
+        if (!navigator.geolocation) {
+          alert("Twoja przeglądarka nie obsługuje geolokalizacji.");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            sendLocation(position.coords.latitude, position.coords.longitude);
+          },
+          (error) => {
+            console.error("Geolokalizacja błąd:", error);
+          }
+        );
+      }
+
+      // QR Skaner
+      function onScanSuccess(decodedText) {
+        document.getElementById(
+          "qr-result"
+        ).innerText = `Zeskanowano: ${decodedText}`;
+
+        fetch("/qr_scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ result: decodedText }),
+        });
+
+        if (decodedText === "zadanie1") {
+          window.location.href = "/zadanie1";
+        }
+      }
+
+      function onScanError(error) {
+        // błędy ignorujemy
+      }
+
+      window.onload = () => {
+        requestAndSendLocation();
+        setInterval(requestAndSendLocation, 10000);
+
+        const qr = new Html5Qrcode("reader");
+        qr.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 250 },
+          onScanSuccess,
+          onScanError
+        );
+      };
+    </script>
+  </body>
+</html>
