@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>Panel Admina</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
@@ -10,69 +11,115 @@
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      crossorigin=""
     />
     <style>
-      #map {
-        height: 60vh;
+      .hidden {
+        display: none;
+      }
+      .gallery-image {
+        max-width: 100px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .gallery-image:hover {
+        transform: scale(1.1);
+      }
+      #fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 100%;
-        border-radius: 15px;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
-        border: 2px solid #333;
-        margin-top: 20px;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
       }
-
-      .leaflet-popup-content-wrapper {
-        background: #222;
-        color: #eee;
-        border-radius: 8px;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
-      }
-
-      .leaflet-popup-tip {
-        background: #222;
+      #fullscreen img {
+        max-width: 90%;
+        max-height: 90%;
       }
     </style>
   </head>
   <body>
     <div class="dashboard-container">
       <h1 class="dashboard-title">Witaj, {{ username }} (Admin)</h1>
-      <p class="dashboard-subtitle">Poniżej znajduje się lokalizacja graczy:</p>
-      <div id="map"></div>
+
+      <div class="dashboard-grid">
+        <div class="tile" onclick="showPanel('map-panel')">
+          <h2>🗺️ Mapa graczy</h2>
+        </div>
+        <div class="tile" onclick="showPanel('times-panel')">
+          <h2>⏱️ Czas wykonania zadań</h2>
+        </div>
+        <div class="tile" onclick="showPanel('gallery-panel')">
+          <h2>📷 Galeria zdjęć</h2>
+        </div>
+      </div>
+
+      <div class="content-panel">
+        <div id="map-panel">
+          <div id="map" style="height: 400px"></div>
+        </div>
+
+        <div id="times-panel" class="hidden">
+          <table id="task-times-table">
+            <thead>
+              <tr>
+                <th>Gracz</th>
+                <th>Zadanie</th>
+                <th>Start</th>
+                <th>Koniec</th>
+                <th>Trwanie (s)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div id="gallery-panel" class="hidden">
+          <div id="photo-gallery"></div>
+        </div>
+      </div>
+
       <button class="logout-button" onclick="window.location.href='/'">
         Wyloguj
       </button>
     </div>
 
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      crossorigin=""
-    ></script>
-    <script>
-      const map = L.map("map").setView([52.237, 21.017], 6); // Polska środek
+    <div id="fullscreen" onclick="this.style.display='none'">
+      <img src="" alt="powiększone zdjęcie" />
+    </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      function showPanel(id) {
+        const panels = ["map-panel", "times-panel", "gallery-panel"];
+        for (const p of panels) {
+          document.getElementById(p).classList.add("hidden");
+        }
+        document.getElementById(id).classList.remove("hidden");
+
+        if (id === "times-panel") loadTimes();
+        if (id === "gallery-panel") loadPhotos();
+      }
+
+      const map = L.map("map").setView([52.237, 21.017], 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
       }).addTo(map);
-
       let markers = {};
 
       async function fetchLocations() {
         try {
           const res = await fetch("/get_locations");
-          if (!res.ok) {
-            console.error("Błąd pobierania lokalizacji");
-            return;
-          }
           const data = await res.json();
-
           for (const user in markers) {
             if (!data[user]) {
               map.removeLayer(markers[user]);
               delete markers[user];
             }
           }
-
           for (const [username, loc] of Object.entries(data)) {
             const latlng = [loc.latitude, loc.longitude];
             if (markers[username]) {
@@ -83,13 +130,67 @@
                 .bindPopup(`<b>${username}</b>`);
             }
           }
-        } catch (error) {
-          console.error("Błąd sieciowy:", error);
+        } catch (err) {
+          console.error("Błąd sieciowy:", err);
         }
       }
 
-      fetchLocations();
       setInterval(fetchLocations, 10000);
+      fetchLocations();
+
+      async function loadTimes() {
+        const res = await fetch("/get_task_times");
+        const data = await res.json();
+        const tbody = document.querySelector("#task-times-table tbody");
+        tbody.innerHTML = "";
+        data.forEach((row) => {
+          const tr = document.createElement("tr");
+          const duration =
+            row.end && row.start
+              ? Math.round((new Date(row.end) - new Date(row.start)) / 1000)
+              : "";
+          tr.innerHTML = `
+  <td>${row.username}</td>
+  <td>${row.task_id}</td>
+  <td>${row.start || ""}</td>
+  <td>${row.end || ""}</td>
+  <td>${duration}</td>
+`;
+          tr.innerHTML = `
+          <td>${row.username}</td>
+          <td>${row.task_id}</td>
+          <td>${row.start_time || ""}</td>
+          <td>${row.end_time || ""}</td>
+          <td>${duration}</td>
+        `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function loadPhotos() {
+        const res = await fetch("/get_photos");
+        const data = await res.json();
+        const gallery = document.getElementById("photo-gallery");
+        gallery.innerHTML = "";
+        data.forEach(({ username, filename }) => {
+          const wrapper = document.createElement("div");
+          const img = document.createElement("img");
+          const label = document.createElement("div");
+
+          img.src = `/static/uploads/solutions/${username}/${filename}`;
+          img.className = "gallery-image";
+          img.onclick = () => {
+            const fs = document.getElementById("fullscreen");
+            fs.style.display = "flex";
+            fs.querySelector("img").src = img.src;
+          };
+
+          label.textContent = filename;
+          wrapper.appendChild(img);
+          wrapper.appendChild(label);
+          gallery.appendChild(wrapper);
+        });
+      }
     </script>
   </body>
 </html>

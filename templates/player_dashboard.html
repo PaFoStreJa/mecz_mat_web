@@ -20,10 +20,11 @@
       </p>
 
       <div id="reader" class="qr-scanner"></div>
+      <!--
       <div id="qr-result" class="qr-result">
         Oczekiwanie na skanowanie kodu QR...
       </div>
-
+      -->
       <button onclick="window.location.href='/'" class="logout-button">
         Wyloguj
       </button>
@@ -62,9 +63,9 @@
 
       // QR Skaner
       function onScanSuccess(decodedText) {
-        document.getElementById(
-          "qr-result"
-        ).innerText = `Zeskanowano: ${decodedText}`;
+        //document.getElementById(
+        //"qr-result"
+        //).innerText = `Zeskanowano: ${decodedText}`;
 
         fetch("/qr_scan", {
           method: "POST",
@@ -72,9 +73,8 @@
           body: JSON.stringify({ result: decodedText }),
         });
 
-        if (decodedText === "zadanie1") {
-          window.location.href = "/zadanie1";
-        }
+        // przekieruj dynamicznie do odpowiedniego zadania
+        window.location.href = `/zadanie/${encodeURIComponent(decodedText)}`;
       }
 
       function onScanError(error) {
