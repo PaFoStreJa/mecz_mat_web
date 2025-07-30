@@ -13,31 +13,137 @@
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
     <style>
-      .hidden {
-        display: none;
-      }
-      .gallery-image {
-        max-width: 100px;
-        cursor: pointer;
-        transition: 0.2s;
-      }
-      .gallery-image:hover {
-        transform: scale(1.1);
-      }
-      #fullscreen {
+      .fullscreen-img {
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: none;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
         justify-content: center;
         align-items: center;
+        z-index: 1000;
+        cursor: pointer;
       }
-      #fullscreen img {
-        max-width: 90%;
-        max-height: 90%;
+
+      // DEBUG FUNKCJA
+      async function debugFiles() {
+        try {
+          const res = await fetch("/debug_files");
+          const data = await res.json();
+
+          const debugDiv = document.getElementById("debug-info");
+          debugDiv.style.display = "block";
+          debugDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        } catch (error) {
+          console.error("Błąd debugowania:", error);
+        }
+      }
+
+      .fullscreen-img img {
+        max-width: 90vw;
+        max-height: 90vh;
+        border-radius: 10px;
+      }
+
+      .fullscreen-img.hidden {
+        display: none;
+      }
+
+      .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .gallery-item {
+        text-align: center;
+        background-color: #2b2b3d;
+        border-radius: 10px;
+        padding: 10px;
+      }
+
+      .gallery-item img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: transform 0.2s;
+      }
+
+      .gallery-item img:hover {
+        transform: scale(1.05);
+      }
+
+      .gallery-item p {
+        font-size: 0.8em;
+        margin-top: 8px;
+        color: #cccccc;
+        word-break: break-all;
+      }
+
+      .gallery-item .username {
+        font-weight: bold;
+        color: #4f78ff;
+        margin-bottom: 5px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        background-color: #2b2b3d;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      th,
+      td {
+        border: 1px solid #444;
+        padding: 8px;
+        text-align: center;
+        font-size: 0.9em;
+      }
+
+      th {
+        background-color: #4f78ff;
+        color: white;
+        font-weight: bold;
+      }
+
+      tr:nth-child(even) {
+        background-color: #3a3a55;
+      }
+
+      .error-message {
+        color: #ff6b6b;
+        padding: 10px;
+        background-color: #ff6b6b20;
+        border-radius: 8px;
+        margin: 10px 0;
+      }
+
+      .loading {
+        color: #4f78ff;
+        font-style: italic;
+      }
+
+      .refresh-btn {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 10px 0;
+        transition: background-color 0.3s;
+      }
+
+      .refresh-btn:hover {
+        background-color: #218838;
       }
     </style>
   </head>
@@ -58,19 +164,28 @@
       </div>
 
       <div class="content-panel">
-        <div id="map-panel">
+        <div id="map-panel" class="">
+          <button class="refresh-btn" onclick="fetchLocations()">
+            🔄 Odśwież lokalizacje
+          </button>
           <div id="map" style="height: 400px"></div>
+          <div id="map-status" class="loading">Ładowanie mapy...</div>
         </div>
 
         <div id="times-panel" class="hidden">
-          <table id="task-times-table">
+          <button class="refresh-btn" onclick="fetchTimes()">
+            🔄 Odśwież czasy
+          </button>
+          <div id="times-status" class="loading">Ładowanie czasów...</div>
+          <table id="times-table">
             <thead>
               <tr>
                 <th>Gracz</th>
                 <th>Zadanie</th>
                 <th>Start</th>
                 <th>Koniec</th>
-                <th>Trwanie (s)</th>
+                <th>Czas trwania</th>
+                <th>Plik</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -78,119 +193,314 @@
         </div>
 
         <div id="gallery-panel" class="hidden">
-          <div id="photo-gallery"></div>
+          <button class="refresh-btn" onclick="fetchGallery()">
+            🔄 Odśwież galerię
+          </button>
+          <button
+            class="refresh-btn"
+            onclick="debugFiles()"
+            style="background-color: #ffa726"
+          >
+            🔍 Debug plików
+          </button>
+          <div id="gallery-status" class="loading">Ładowanie galerii...</div>
+          <div
+            id="debug-info"
+            style="
+              display: none;
+              background: #2b2b3d;
+              padding: 10px;
+              border-radius: 5px;
+              margin: 10px 0;
+              font-family: monospace;
+              font-size: 12px;
+            "
+          ></div>
+          <div class="gallery-grid" id="gallery-container"></div>
         </div>
       </div>
 
-      <button class="logout-button" onclick="window.location.href='/'">
+      <button class="logout-button" onclick="window.location.href='/logout'">
         Wyloguj
       </button>
     </div>
 
-    <div id="fullscreen" onclick="this.style.display='none'">
-      <img src="" alt="powiększone zdjęcie" />
+    <div
+      class="fullscreen-img hidden"
+      id="fullscreen-img"
+      onclick="this.classList.add('hidden')"
+    >
+      <img src="" alt="Powiększone zdjęcie" />
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
       function showPanel(id) {
-        const panels = ["map-panel", "times-panel", "gallery-panel"];
-        for (const p of panels) {
-          document.getElementById(p).classList.add("hidden");
-        }
+        ["map-panel", "times-panel", "gallery-panel"].forEach((p) =>
+          document.getElementById(p).classList.add("hidden")
+        );
         document.getElementById(id).classList.remove("hidden");
 
-        if (id === "times-panel") loadTimes();
-        if (id === "gallery-panel") loadPhotos();
+        // Odśwież dane po przełączeniu panelu
+        if (id === "map-panel") {
+          setTimeout(() => map.invalidateSize(), 100);
+        }
       }
 
-      const map = L.map("map").setView([52.237, 21.017], 6);
+      function showError(elementId, message) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `<div class="error-message">❌ ${message}</div>`;
+      }
+
+      function showLoading(elementId, message = "Ładowanie...") {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `<div class="loading">${message}</div>`;
+      }
+
+      // MAPA
+      const map = L.map("map").setView([50.0647, 19.945], 12); // Kraków jako domyślna lokalizacja
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
+        attribution: "© OpenStreetMap contributors",
       }).addTo(map);
       let markers = {};
 
       async function fetchLocations() {
+        showLoading("map-status", "Pobieranie lokalizacji...");
         try {
           const res = await fetch("/get_locations");
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
           const data = await res.json();
+
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          // Usuń nieistniejących użytkowników
           for (const user in markers) {
             if (!data[user]) {
               map.removeLayer(markers[user]);
               delete markers[user];
             }
           }
+
+          // Dodaj/zaktualizuj markery
+          let activeUsers = 0;
           for (const [username, loc] of Object.entries(data)) {
             const latlng = [loc.latitude, loc.longitude];
+            const lastUpdate = new Date(loc.last_update);
+            const timeAgo = Math.round((new Date() - lastUpdate) / 1000 / 60);
+
             if (markers[username]) {
               markers[username].setLatLng(latlng);
+              markers[username].setPopupContent(
+                `<b>${username}</b><br>Ostatnia aktualizacja: ${timeAgo} min temu`
+              );
             } else {
               markers[username] = L.marker(latlng)
                 .addTo(map)
-                .bindPopup(`<b>${username}</b>`);
+                .bindPopup(
+                  `<b>${username}</b><br>Ostatnia aktualizacja: ${timeAgo} min temu`
+                );
             }
+            activeUsers++;
           }
-        } catch (err) {
-          console.error("Błąd sieciowy:", err);
+
+          document.getElementById(
+            "map-status"
+          ).innerHTML = `<div style="color: #00c853;">✅ Aktywni gracze: ${activeUsers}</div>`;
+        } catch (error) {
+          console.error("Błąd pobierania lokalizacji:", error);
+          showError(
+            "map-status",
+            `Nie udało się pobrać lokalizacji: ${error.message}`
+          );
         }
       }
 
-      setInterval(fetchLocations, 10000);
-      fetchLocations();
+      // TABELA CZASÓW
+      async function fetchTimes() {
+        showLoading("times-status", "Pobieranie czasów wykonania...");
+        try {
+          const res = await fetch("/get_task_times");
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          const data = await res.json();
 
-      async function loadTimes() {
-        const res = await fetch("/get_task_times");
-        const data = await res.json();
-        const tbody = document.querySelector("#task-times-table tbody");
-        tbody.innerHTML = "";
-        data.forEach((row) => {
-          const tr = document.createElement("tr");
-          const duration =
-            row.end && row.start
-              ? Math.round((new Date(row.end) - new Date(row.start)) / 1000)
-              : "";
-          tr.innerHTML = `
-  <td>${row.username}</td>
-  <td>${row.task_id}</td>
-  <td>${row.start || ""}</td>
-  <td>${row.end || ""}</td>
-  <td>${duration}</td>
-`;
-          tr.innerHTML = `
-          <td>${row.username}</td>
-          <td>${row.task_id}</td>
-          <td>${row.start_time || ""}</td>
-          <td>${row.end_time || ""}</td>
-          <td>${duration}</td>
-        `;
-          tbody.appendChild(tr);
-        });
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          const tbody = document.querySelector("#times-table tbody");
+          tbody.innerHTML = "";
+
+          data.forEach((row) => {
+            const tr = document.createElement("tr");
+            const startDate = row.start
+              ? new Date(row.start).toLocaleString("pl-PL")
+              : "-";
+            const endDate = row.end
+              ? new Date(row.end).toLocaleString("pl-PL")
+              : "-";
+            const filename = row.filename || "-";
+
+            tr.innerHTML = `
+              <td>${row.username}</td>
+              <td title="${row.task_id}">${row.task_id.substring(0, 8)}...</td>
+              <td>${startDate}</td>
+              <td>${endDate}</td>
+              <td>${row.duration || "-"}</td>
+              <td>${filename}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          document.getElementById(
+            "times-status"
+          ).innerHTML = `<div style="color: #00c853;">✅ Załadowano ${data.length} rekordów</div>`;
+        } catch (error) {
+          console.error("Błąd pobierania czasów:", error);
+          showError(
+            "times-status",
+            `Nie udało się pobrać czasów: ${error.message}`
+          );
+        }
       }
 
-      async function loadPhotos() {
-        const res = await fetch("/get_photos");
-        const data = await res.json();
-        const gallery = document.getElementById("photo-gallery");
-        gallery.innerHTML = "";
-        data.forEach(({ username, filename }) => {
-          const wrapper = document.createElement("div");
-          const img = document.createElement("img");
-          const label = document.createElement("div");
+      // GALERIA
+      async function fetchGallery() {
+        showLoading("gallery-status", "Pobieranie galerii...");
+        try {
+          const res = await fetch("/get_gallery");
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          const data = await res.json();
 
-          img.src = `/static/uploads/solutions/${username}/${filename}`;
-          img.className = "gallery-image";
-          img.onclick = () => {
-            const fs = document.getElementById("fullscreen");
-            fs.style.display = "flex";
-            fs.querySelector("img").src = img.src;
-          };
+          if (data.error) {
+            throw new Error(data.error);
+          }
 
-          label.textContent = filename;
-          wrapper.appendChild(img);
-          wrapper.appendChild(label);
-          gallery.appendChild(wrapper);
-        });
+          const container = document.getElementById("gallery-container");
+          container.innerHTML = "";
+
+          if (data.length === 0) {
+            container.innerHTML =
+              '<div style="color: #cccccc; text-align: center; padding: 20px;">Brak zdjęć w galerii</div>';
+            document.getElementById(
+              "gallery-status"
+            ).innerHTML = `<div style="color: #ffa726;">⚠️ Galeria jest pusta</div>`;
+            return;
+          }
+
+          data.forEach((item) => {
+            const div = document.createElement("div");
+            div.className = "gallery-item";
+
+            const img = document.createElement("img");
+
+            // Testuj różne URL-e w kolejności preferencji
+            const urlsToTry = [
+              item.image_url, // Custom endpoint
+              item.static_url, // Flask static
+              item.direct_path, // Direct static path
+              `/uploads/solutions/${item.username}/${item.filename}`, // Fallback
+            ].filter((url) => url); // Usuń puste URL-e
+
+            let urlIndex = 0;
+
+            function tryNextUrl() {
+              if (urlIndex < urlsToTry.length) {
+                img.src = urlsToTry[urlIndex];
+                console.log(
+                  `Próbuję URL ${urlIndex + 1}/${urlsToTry.length}: ${img.src}`
+                );
+                urlIndex++;
+              } else {
+                console.error("Wszystkie URL-e nie działają:", urlsToTry);
+                img.src =
+                  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiBmaWxsPSIjMzMzIi8+Cjx0ZXh0IHg9Ijc1IiB5PSI3NSIgZmlsbD0iIzY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+QnJhayBvYnJhenU8L3RleHQ+Cjwvc3ZnPg==";
+              }
+            }
+
+            img.alt = `Rozwiązanie ${item.username}`;
+            img.onerror = function () {
+              console.error("Błąd ładowania obrazu:", this.src);
+              tryNextUrl();
+            };
+            img.onload = function () {
+              console.log("Obraz załadowany pomyślnie:", this.src);
+            };
+
+            // Rozpocznij ładowanie
+            tryNextUrl();
+
+            img.onclick = () => {
+              document
+                .getElementById("fullscreen-img")
+                .classList.remove("hidden");
+              document.querySelector("#fullscreen-img img").src = img.src;
+            };
+
+            const userDiv = document.createElement("div");
+            userDiv.className = "username";
+            userDiv.textContent = item.username;
+
+            const fileDiv = document.createElement("p");
+            fileDiv.innerHTML = `${item.filename}<br>
+              <small style="color: #888;">
+                Rozmiar: ${item.file_size || 0} B<br>
+                Istnieje: ${item.file_exists ? "✅" : "❌"}
+              </small>`;
+
+            div.appendChild(img);
+            div.appendChild(userDiv);
+            div.appendChild(fileDiv);
+            container.appendChild(div);
+          });
+
+          document.getElementById(
+            "gallery-status"
+          ).innerHTML = `<div style="color: #00c853;">✅ Załadowano ${data.length} zdjęć</div>`;
+        } catch (error) {
+          console.error("Błąd pobierania galerii:", error);
+          showError(
+            "gallery-status",
+            `Nie udało się pobrać galerii: ${error.message}`
+          );
+        }
       }
+
+      // Inicjalizacja
+      document.addEventListener("DOMContentLoaded", function () {
+        fetchLocations();
+        fetchTimes();
+        fetchGallery();
+
+        // Auto-refresh co 30 sekund
+        setInterval(() => {
+          if (
+            !document.getElementById("map-panel").classList.contains("hidden")
+          ) {
+            fetchLocations();
+          }
+          if (
+            !document.getElementById("times-panel").classList.contains("hidden")
+          ) {
+            fetchTimes();
+          }
+        }, 30000);
+      });
+
+      // Obsługa klawiszy
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          document.getElementById("fullscreen-img").classList.add("hidden");
+        }
+      });
     </script>
   </body>
 </html>
