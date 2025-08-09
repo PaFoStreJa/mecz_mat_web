@@ -122,39 +122,82 @@ def update_location():
     if "username" not in session:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Brak danych JSON"}), 400
-
-    latitude = data.get("latitude")
-    longitude = data.get("longitude")
-
-    if latitude is None or longitude is None:
-        return jsonify({"error": "Nieprawidłowe dane lokalizacji"}), 400
-
     try:
-        latitude = float(latitude)
-        longitude = float(longitude)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Nieprawidłowy format współrzędnych"}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Brak danych JSON"}), 400
 
-    username = session["username"]
-    players_location[username] = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "last_update": datetime.utcnow().isoformat() + "Z"
-    }
-    
-    # Zapisz do pliku
-    save_json_file(LOCATIONS_FILE, players_location)
-    
-    return jsonify({"status": "success"})
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+
+        if latitude is None or longitude is None:
+            return jsonify({"error": "Nieprawidłowe dane lokalizacji"}), 400
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Nieprawidłowy format współrzędnych"}), 400
+
+        # Sprawdź czy współrzędne są w rozsądnym zakresie
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            return jsonify({"error": "Współrzędne poza dozwolonym zakresem"}), 400
+
+        username = session["username"]
+        
+        # Dodaj więcej informacji do zapisywanej lokalizacji
+        location_data = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "last_update": datetime.utcnow().isoformat() + "Z",
+            "accuracy": data.get("accuracy"),
+            "timestamp": data.get("timestamp"),
+            "user_agent": request.headers.get('User-Agent', '')[:100]  # Ograniczone do 100 znaków
+        }
+        
+        players_location[username] = location_data
+        
+        # Zapisz do pliku z obsługą błędów
+        if save_json_file(LOCATIONS_FILE, players_location):
+            print(f"DEBUG: Zapisano lokalizację dla {username}: {latitude:.6f}, {longitude:.6f}")
+            return jsonify({"status": "success", "message": "Lokalizacja zaktualizowana"})
+        else:
+            return jsonify({"error": "Błąd zapisu do pliku"}), 500
+            
+    except Exception as e:
+        print(f"Błąd podczas aktualizacji lokalizacji: {e}")
+        return jsonify({"error": "Wewnętrzny błąd serwera"}), 500
 
 @app.route("/get_locations")
 def get_locations():
     if "username" not in session or session.get("role") != "admin":
         return jsonify({"error": "Unauthorized"}), 401
-    return jsonify(players_location)
+    
+    try:
+        # Przefiltruj stare lokalizacje (starsze niż 24 godziny)
+        current_time = datetime.utcnow()
+        filtered_locations = {}
+        
+        for username, location in players_location.items():
+            try:
+                last_update = datetime.fromisoformat(location["last_update"].replace('Z', '+00:00'))
+                time_diff = (current_time - last_update.replace(tzinfo=None)).total_seconds() / 3600
+                
+                # Zachowaj lokalizacje młodsze niż 24 godziny
+                if time_diff < 24:
+                    filtered_locations[username] = location
+                else:
+                    print(f"DEBUG: Odfiltrowano starą lokalizację {username} ({time_diff:.1f}h)")
+            except (ValueError, KeyError) as e:
+                print(f"DEBUG: Błąd parsowania daty dla {username}: {e}")
+                # Zachowaj lokalizacje z błędami daty (mogą być nowe)
+                filtered_locations[username] = location
+        
+        return jsonify(filtered_locations)
+        
+    except Exception as e:
+        print(f"Błąd podczas pobierania lokalizacji: {e}")
+        return jsonify({"error": "Błąd pobierania danych"}), 500
 
 @app.route("/zadanie/<task_id>")
 def pokaz_zadanie(task_id):
@@ -214,30 +257,33 @@ def upload_solution(task_id):
     if task_id not in TASKS:
         return jsonify({"error": "Nieprawidłowe zadanie"}), 400
 
-    # Sprawdź czy użytkownik już wysłał rozwiązanie
-    if username not in zadania_rozwiazania:
-        zadania_rozwiazania[username] = set()
-    elif isinstance(zadania_rozwiazania[username], list):
-        zadania_rozwiazania[username] = set(zadania_rozwiazania[username])
-
-    if task_id in zadania_rozwiazania[username]:
-        return jsonify({"status": "already_sent", "message": "Rozwiązanie już zostało wysłane"}), 200
-
-    # Sprawdź plik
-    if 'file' not in request.files:
-        return jsonify({"error": "Brak pliku"}), 400
-        
-    file = request.files['file']
-    if file.filename == "":
-        return jsonify({"error": "Nie wybrano pliku"}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({"error": "Nieprawidłowy typ pliku. Dozwolone: png, jpg, jpeg, gif"}), 400
-
     try:
+        # Sprawdź czy użytkownik już wysłał rozwiązanie
+        if username not in zadania_rozwiazania:
+            zadania_rozwiazania[username] = set()
+        elif isinstance(zadania_rozwiazania[username], list):
+            zadania_rozwiazania[username] = set(zadania_rozwiazania[username])
+
+        if task_id in zadania_rozwiazania[username]:
+            return jsonify({"status": "already_sent", "message": "Rozwiązanie już zostało wysłane"}), 200
+
+        # Sprawdź plik
+        if 'file' not in request.files:
+            return jsonify({"error": "Brak pliku"}), 400
+            
+        file = request.files['file']
+        if file.filename == "":
+            return jsonify({"error": "Nie wybrano pliku"}), 400
+
+        if file.filename and not allowed_file(file.filename):
+            return jsonify({"error": "Nieprawidłowy typ pliku. Dozwolone: png, jpg, jpeg, gif"}), 400
+
         # Bezpieczna nazwa pliku
-        filename = secure_filename(f"{username}_{task_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
-        user_folder = os.path.join(UPLOAD_FOLDER, username)
+        original_filename = secure_filename(file.filename) if file.filename else "image.jpg"
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = secure_filename(f"{username}_{task_id}_{timestamp}.jpg")
+        
+        user_folder = os.path.join(UPLOAD_FOLDER, secure_filename(username))
         os.makedirs(user_folder, exist_ok=True)
         filepath = os.path.join(user_folder, filename)
         
@@ -272,7 +318,9 @@ def upload_solution(task_id):
             "start": start.isoformat(),
             "end": end.isoformat(),
             "duration": duration,
-            "filename": filename
+            "filename": filename,
+            "original_filename": original_filename,
+            "file_size": os.path.getsize(filepath) if os.path.exists(filepath) else 0
         }
         task_times.append(record)
 
@@ -282,20 +330,28 @@ def upload_solution(task_id):
         for user, solutions in zadania_rozwiazania.items():
             solutions_for_json[user] = list(solutions) if isinstance(solutions, set) else solutions
 
-        save_json_file(SOLUTIONS_FILE, solutions_for_json)
-        save_json_file(TASK_TIMES_FILE, task_times)
+        if not save_json_file(SOLUTIONS_FILE, solutions_for_json):
+            return jsonify({"error": "Błąd zapisu rozwiązań"}), 500
+            
+        if not save_json_file(TASK_TIMES_FILE, task_times):
+            return jsonify({"error": "Błąd zapisu czasów"}), 500
 
         return jsonify({"status": "success", "message": "Rozwiązanie zostało wysłane"})
 
     except Exception as e:
         print(f"Błąd podczas uploadu: {e}")
-        return jsonify({"error": "Błąd podczas zapisywania pliku"}), 500
+        return jsonify({"error": f"Błąd podczas zapisywania pliku: {str(e)}"}), 500
 
 @app.route("/get_task_times")
 def get_task_times():
     if "username" not in session or session.get("role") != "admin":
         return jsonify({"error": "Unauthorized"}), 401
-    return jsonify(task_times)
+    
+    try:
+        return jsonify(task_times)
+    except Exception as e:
+        print(f"Błąd podczas pobierania czasów: {e}")
+        return jsonify({"error": "Błąd pobierania czasów"}), 500
 
 @app.route("/get_gallery")
 def get_gallery():
@@ -311,18 +367,23 @@ def get_gallery():
                 if os.path.isdir(user_path):
                     for filename in os.listdir(user_path):
                         if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                            # Generuj różne warianty URL-ów do testowania
-                            gallery.append({
-                                'username': user, 
-                                'filename': filename, 
-                                'rel_url': f"uploads/solutions/{user}/{filename}",
-                                'image_url': url_for('uploaded_file', user=user, filename=filename),
-                                'static_url': url_for('static', filename=f'uploads/solutions/{user}/{filename}'),
-                                'direct_path': f'/static/uploads/solutions/{user}/{filename}',
-                                'full_path': os.path.join(user_path, filename),
-                                'file_exists': os.path.exists(os.path.join(user_path, filename)),
-                                'file_size': os.path.getsize(os.path.join(user_path, filename)) if os.path.exists(os.path.join(user_path, filename)) else 0
-                            })
+                            file_path = os.path.join(user_path, filename)
+                            
+                            # Sprawdź czy plik rzeczywiście istnieje i ma rozmiar > 0
+                            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                                gallery.append({
+                                    'username': user, 
+                                    'filename': filename, 
+                                    'rel_url': f"uploads/solutions/{user}/{filename}",
+                                    'image_url': url_for('uploaded_file', user=user, filename=filename),
+                                    'static_url': url_for('static', filename=f'uploads/solutions/{user}/{filename}'),
+                                    'direct_path': f'/static/uploads/solutions/{user}/{filename}',
+                                    'full_path': file_path,
+                                    'file_exists': True,
+                                    'file_size': os.path.getsize(file_path)
+                                })
+                            else:
+                                print(f"DEBUG: Pomijam uszkodzony plik: {file_path}")
     except Exception as e:
         print(f"Błąd podczas pobierania galerii: {e}")
         return jsonify({"error": f"Błąd podczas pobierania galerii: {str(e)}"}), 500
@@ -335,25 +396,34 @@ def uploaded_file(user, filename):
     if "username" not in session or session.get("role") != "admin":
         return "Unauthorized", 401
     
-    # Bezpieczne sprawdzenie ścieżki
-    safe_user = secure_filename(user)
-    safe_filename = secure_filename(filename)
-    
-    user_folder = os.path.join(UPLOAD_FOLDER, safe_user)
-    print(f"DEBUG: Szukam pliku w: {user_folder}/{safe_filename}")
-    
-    if not os.path.exists(user_folder):
-        print(f"DEBUG: Folder użytkownika nie istnieje: {user_folder}")
-        return f"User folder not found: {user_folder}", 404
-    
-    file_path = os.path.join(user_folder, safe_filename)
-    if not os.path.exists(file_path):
-        print(f"DEBUG: Plik nie istnieje: {file_path}")
-        return f"File not found: {file_path}", 404
-    
-    print(f"DEBUG: Serwuję plik: {file_path}")
-    # Użyj send_from_directory zamiast send_static_file
-    return send_from_directory(user_folder, safe_filename)
+    try:
+        # Bezpieczne sprawdzenie ścieżki
+        safe_user = secure_filename(user)
+        safe_filename = secure_filename(filename)
+        
+        user_folder = os.path.join(UPLOAD_FOLDER, safe_user)
+        print(f"DEBUG: Szukam pliku w: {user_folder}/{safe_filename}")
+        
+        if not os.path.exists(user_folder):
+            print(f"DEBUG: Folder użytkownika nie istnieje: {user_folder}")
+            return f"User folder not found: {user_folder}", 404
+        
+        file_path = os.path.join(user_folder, safe_filename)
+        if not os.path.exists(file_path):
+            print(f"DEBUG: Plik nie istnieje: {file_path}")
+            return f"File not found: {file_path}", 404
+        
+        if os.path.getsize(file_path) == 0:
+            print(f"DEBUG: Plik jest pusty: {file_path}")
+            return "File is empty", 404
+        
+        print(f"DEBUG: Serwuję plik: {file_path}")
+        # Użyj send_from_directory zamiast send_static_file
+        return send_from_directory(user_folder, safe_filename)
+        
+    except Exception as e:
+        print(f"Błąd podczas serwowania pliku: {e}")
+        return f"Server error: {str(e)}", 500
 
 @app.route("/debug_files")
 def debug_files():
@@ -365,7 +435,11 @@ def debug_files():
         "upload_folder_exists": os.path.exists(UPLOAD_FOLDER),
         "upload_folder_path": UPLOAD_FOLDER,
         "current_working_directory": os.getcwd(),
-        "files_structure": {}
+        "base_dir": BASE_DIR,
+        "static_folder": app.static_folder,
+        "files_structure": {},
+        "total_files": 0,
+        "total_size": 0
     }
     
     try:
@@ -373,9 +447,28 @@ def debug_files():
             for user in os.listdir(UPLOAD_FOLDER):
                 user_path = os.path.join(UPLOAD_FOLDER, user)
                 if os.path.isdir(user_path):
+                    user_files = []
+                    user_total_size = 0
+                    
+                    for filename in os.listdir(user_path):
+                        file_path = os.path.join(user_path, filename)
+                        if os.path.isfile(file_path):
+                            file_size = os.path.getsize(file_path)
+                            user_files.append({
+                                "name": filename,
+                                "size": file_size,
+                                "path": file_path,
+                                "is_image": filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))
+                            })
+                            user_total_size += file_size
+                            debug_info["total_files"] += 1
+                            debug_info["total_size"] += file_size
+                    
                     debug_info["files_structure"][user] = {
                         "path": user_path,
-                        "files": os.listdir(user_path)
+                        "files": user_files,
+                        "total_files": len(user_files),
+                        "total_size": user_total_size
                     }
     except Exception as e:
         debug_info["error"] = str(e)
@@ -386,6 +479,23 @@ def debug_files():
 def get_gallery_images():
     """Alternatywny endpoint dla galerii (kompatybilność z HTML)"""
     return get_gallery()
+
+@app.route("/test_geolocation")
+def test_geolocation():
+    """Endpoint do testowania wsparcia geolokalizacji"""
+    if "username" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    return jsonify({
+        "username": session["username"],
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "user_agent": request.headers.get('User-Agent', ''),
+        "is_https": request.is_secure,
+        "protocol": request.scheme,
+        "host": request.host,
+        "remote_addr": request.remote_addr,
+        "headers": dict(request.headers)
+    })
 
 @app.route("/logout")
 def logout():

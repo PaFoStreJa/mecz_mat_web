@@ -1,7 +1,10 @@
 {
   "gracz1": {
-    "latitude": 49.6500736,
-    "longitude": 21.1877888,
-    "last_update": "2025-07-30T07:59:55.949923Z"
+    "latitude": 50.019673705553785,
+    "longitude": 20.106878101021387,
+    "last_update": "2025-08-09T08:03:00.184863Z",
+    "accuracy": null,
+    "timestamp": null,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Sa"
   }
 }

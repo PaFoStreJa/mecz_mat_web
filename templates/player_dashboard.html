@@ -7,10 +7,21 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
     <script
       src="https://unpkg.com/html5-qrcode"
       type="text/javascript"
     ></script>
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
+    <style></style>
   </head>
   <body>
     <div class="dashboard-container">
@@ -20,17 +31,15 @@
       </p>
 
       <div id="reader" class="qr-scanner"></div>
-      <!--
-      <div id="qr-result" class="qr-result">
-        Oczekiwanie na skanowanie kodu QR...
-      </div>
-      -->
-      <button onclick="window.location.href='/'" class="logout-button">
+
+      <button onclick="window.location.href='/logout'" class="logout-button">
         Wyloguj
       </button>
     </div>
 
     <script>
+      let locationWatchId = null;
+
       // Wysyłanie lokalizacji
       function sendLocation(lat, lon) {
         fetch("/update_location", {
@@ -41,57 +50,101 @@
           body: JSON.stringify({ latitude: lat, longitude: lon }),
         })
           .then((res) => res.json())
-          .then((data) => console.log("Location sent:", data))
-          .catch((err) => console.error("Location error:", err));
+          .then((data) => {
+            console.log("Location sent:", data);
+          })
+          .catch((err) => {
+            console.error("Location error:", err);
+          });
       }
 
-      function requestAndSendLocation() {
+      // Obsługa pozycji z GPS
+      function handlePosition(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        sendLocation(lat, lon);
+      }
+
+      // Obsługa błędów GPS (bez wyświetlania użytkownikowi)
+      function handleLocationError(error) {
+        console.error("Geolocation error:", error);
+        // Logujemy błędy tylko do konsoli, nie pokazujemy użytkownikowi
+      }
+
+      // Inicjalizacja lokalizacji
+      function initializeLocation() {
         if (!navigator.geolocation) {
-          alert("Twoja przeglądarka nie obsługuje geolokalizacji.");
+          console.error("Geolocation not supported");
           return;
         }
 
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            sendLocation(position.coords.latitude, position.coords.longitude);
-          },
-          (error) => {
-            console.error("Geolokalizacja błąd:", error);
-          }
+        // Opcje geolokalizacji
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000,
+        };
+
+        // Rozpocznij śledzenie lokalizacji
+        locationWatchId = navigator.geolocation.watchPosition(
+          handlePosition,
+          handleLocationError,
+          options
         );
       }
 
       // QR Skaner
       function onScanSuccess(decodedText) {
-        //document.getElementById(
-        //"qr-result"
-        //).innerText = `Zeskanowano: ${decodedText}`;
+        // Zatrzymaj skaner
+        if (window.qrScanner) {
+          window.qrScanner.stop();
+        }
 
-        fetch("/qr_scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ result: decodedText }),
-        });
-
-        // przekieruj dynamicznie do odpowiedniego zadania
+        // Przekieruj do zadania
         window.location.href = `/zadanie/${encodeURIComponent(decodedText)}`;
       }
 
       function onScanError(error) {
-        // błędy ignorujemy
+        // Błędy skanowania ignorujemy (są bardzo częste)
       }
 
+      // Inicjalizacja aplikacji
       window.onload = () => {
-        requestAndSendLocation();
-        setInterval(requestAndSendLocation, 10000);
+        // Inicjalizuj lokalizację (w tle, bez powiadomień dla użytkownika)
+        initializeLocation();
 
-        const qr = new Html5Qrcode("reader");
-        qr.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          onScanSuccess,
-          onScanError
-        );
+        // Inicjalizuj skaner QR
+        try {
+          const qr = new Html5Qrcode("reader");
+          window.qrScanner = qr; // Zapisz referencję do późniejszego użycia
+
+          qr.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+              aspectRatio: 1.0,
+            },
+            onScanSuccess,
+            onScanError
+          ).catch((err) => {
+            console.error("QR Scanner error:", err);
+            document.getElementById("reader").innerHTML =
+              '<div style="color: #ff6b6b; padding: 20px; text-align: center;">❌ Nie udało się uruchomić skanera QR.<br>Sprawdź dostęp do kamery.</div>';
+          });
+        } catch (err) {
+          console.error("QR Scanner initialization error:", err);
+        }
+      };
+
+      // Czyszczenie przy opuszczeniu strony
+      window.onbeforeunload = () => {
+        if (locationWatchId) {
+          navigator.geolocation.clearWatch(locationWatchId);
+        }
+        if (window.qrScanner) {
+          window.qrScanner.stop();
+        }
       };
     </script>
   </body>

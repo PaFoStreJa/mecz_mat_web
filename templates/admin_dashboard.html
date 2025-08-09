@@ -12,6 +12,11 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
     <style>
       .fullscreen-img {
         position: fixed;
@@ -25,20 +30,6 @@
         align-items: center;
         z-index: 1000;
         cursor: pointer;
-      }
-
-      // DEBUG FUNKCJA
-      async function debugFiles() {
-        try {
-          const res = await fetch("/debug_files");
-          const data = await res.json();
-
-          const debugDiv = document.getElementById("debug-info");
-          debugDiv.style.display = "block";
-          debugDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-        } catch (error) {
-          console.error("Błąd debugowania:", error);
-        }
       }
 
       .fullscreen-img img {
@@ -131,6 +122,22 @@
         font-style: italic;
       }
 
+      .success-message {
+        color: #00c853;
+        padding: 10px;
+        background-color: #00c85320;
+        border-radius: 8px;
+        margin: 10px 0;
+      }
+
+      .warning-message {
+        color: #ffa726;
+        padding: 10px;
+        background-color: #ffa72620;
+        border-radius: 8px;
+        margin: 10px 0;
+      }
+
       .refresh-btn {
         background-color: #28a745;
         color: white;
@@ -138,12 +145,41 @@
         padding: 8px 16px;
         border-radius: 5px;
         cursor: pointer;
-        margin: 10px 0;
+        margin: 10px 5px 10px 0;
         transition: background-color 0.3s;
       }
 
       .refresh-btn:hover {
         background-color: #218838;
+      }
+
+      .refresh-btn:disabled {
+        background-color: #666;
+        cursor: not-allowed;
+      }
+
+      .map-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 10px 0;
+        font-size: 0.9em;
+      }
+
+      .map-stat {
+        text-align: center;
+        padding: 5px;
+      }
+
+      .marker-active {
+        color: #00c853;
+      }
+
+      .marker-inactive {
+        color: #ff6b6b;
+      }
+
+      .marker-old {
+        color: #ffa726;
       }
     </style>
   </head>
@@ -165,15 +201,34 @@
 
       <div class="content-panel">
         <div id="map-panel" class="">
-          <button class="refresh-btn" onclick="fetchLocations()">
+          <button
+            class="refresh-btn"
+            onclick="fetchLocations()"
+            id="refresh-locations-btn"
+          >
             🔄 Odśwież lokalizacje
           </button>
+          <div class="map-stats">
+            <div class="map-stat">
+              <div class="marker-active">● Aktywny (< 5 min)</div>
+            </div>
+            <div class="map-stat">
+              <div class="marker-old">● Nieaktualny (5-30 min)</div>
+            </div>
+            <div class="map-stat">
+              <div class="marker-inactive">● Nieaktywny (> 30 min)</div>
+            </div>
+          </div>
           <div id="map" style="height: 400px"></div>
           <div id="map-status" class="loading">Ładowanie mapy...</div>
         </div>
 
         <div id="times-panel" class="hidden">
-          <button class="refresh-btn" onclick="fetchTimes()">
+          <button
+            class="refresh-btn"
+            onclick="fetchTimes()"
+            id="refresh-times-btn"
+          >
             🔄 Odśwież czasy
           </button>
           <div id="times-status" class="loading">Ładowanie czasów...</div>
@@ -193,13 +248,18 @@
         </div>
 
         <div id="gallery-panel" class="hidden">
-          <button class="refresh-btn" onclick="fetchGallery()">
+          <button
+            class="refresh-btn"
+            onclick="fetchGallery()"
+            id="refresh-gallery-btn"
+          >
             🔄 Odśwież galerię
           </button>
           <button
             class="refresh-btn"
             onclick="debugFiles()"
             style="background-color: #ffa726"
+            id="debug-files-btn"
           >
             🔍 Debug plików
           </button>
@@ -243,7 +303,9 @@
 
         // Odśwież dane po przełączeniu panelu
         if (id === "map-panel") {
-          setTimeout(() => map.invalidateSize(), 100);
+          setTimeout(() => {
+            if (map) map.invalidateSize();
+          }, 100);
         }
       }
 
@@ -252,9 +314,35 @@
         element.innerHTML = `<div class="error-message">❌ ${message}</div>`;
       }
 
+      function showSuccess(elementId, message) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `<div class="success-message">✅ ${message}</div>`;
+      }
+
+      function showWarning(elementId, message) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `<div class="warning-message">⚠️ ${message}</div>`;
+      }
+
       function showLoading(elementId, message = "Ładowanie...") {
         const element = document.getElementById(elementId);
         element.innerHTML = `<div class="loading">${message}</div>`;
+      }
+
+      function disableButton(buttonId, text = "Ładowanie...") {
+        const btn = document.getElementById(buttonId);
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = text;
+        }
+      }
+
+      function enableButton(buttonId, text) {
+        const btn = document.getElementById(buttonId);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = text;
+        }
       }
 
       // MAPA
@@ -265,8 +353,24 @@
       }).addTo(map);
       let markers = {};
 
+      function getMarkerColor(minutesAgo) {
+        if (minutesAgo < 5) return "green";
+        if (minutesAgo < 30) return "orange";
+        return "red";
+      }
+
+      function createColoredMarker(color) {
+        return L.divIcon({
+          html: `<div style="background-color: ${color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+      }
+
       async function fetchLocations() {
+        disableButton("refresh-locations-btn", "🔄 Odświeżanie...");
         showLoading("map-status", "Pobieranie lokalizacji...");
+
         try {
           const res = await fetch("/get_locations");
           if (!res.ok) {
@@ -288,41 +392,87 @@
 
           // Dodaj/zaktualizuj markery
           let activeUsers = 0;
+          let inactiveUsers = 0;
+          let oldUsers = 0;
+
+          if (Object.keys(data).length === 0) {
+            showWarning(
+              "map-status",
+              "Brak danych o lokalizacji graczy. Sprawdź czy gracze mają włączoną lokalizację."
+            );
+            enableButton("refresh-locations-btn", "🔄 Odśwież lokalizacje");
+            return;
+          }
+
           for (const [username, loc] of Object.entries(data)) {
             const latlng = [loc.latitude, loc.longitude];
             const lastUpdate = new Date(loc.last_update);
             const timeAgo = Math.round((new Date() - lastUpdate) / 1000 / 60);
+            const color = getMarkerColor(timeAgo);
+
+            // Klasyfikuj użytkowników
+            if (timeAgo < 5) activeUsers++;
+            else if (timeAgo < 30) oldUsers++;
+            else inactiveUsers++;
+
+            const popupContent = `
+              <b>${username}</b><br>
+              Ostatnia aktualizacja: ${timeAgo} min temu<br>
+              Status: ${
+                timeAgo < 5
+                  ? "🟢 Aktywny"
+                  : timeAgo < 30
+                  ? "🟡 Nieaktualny"
+                  : "🔴 Nieaktywny"
+              }<br>
+              Czas: ${lastUpdate.toLocaleString("pl-PL")}
+            `;
 
             if (markers[username]) {
               markers[username].setLatLng(latlng);
-              markers[username].setPopupContent(
-                `<b>${username}</b><br>Ostatnia aktualizacja: ${timeAgo} min temu`
-              );
+              markers[username].setPopupContent(popupContent);
+              markers[username].setIcon(createColoredMarker(color));
             } else {
-              markers[username] = L.marker(latlng)
+              markers[username] = L.marker(latlng, {
+                icon: createColoredMarker(color),
+              })
                 .addTo(map)
-                .bindPopup(
-                  `<b>${username}</b><br>Ostatnia aktualizacja: ${timeAgo} min temu`
-                );
+                .bindPopup(popupContent);
             }
-            activeUsers++;
           }
 
-          document.getElementById(
-            "map-status"
-          ).innerHTML = `<div style="color: #00c853;">✅ Aktywni gracze: ${activeUsers}</div>`;
+          const totalUsers = activeUsers + oldUsers + inactiveUsers;
+          let statusMessage = `Gracze: ${totalUsers} (🟢 ${activeUsers} aktywnych`;
+          if (oldUsers > 0) statusMessage += `, 🟡 ${oldUsers} nieaktualnych`;
+          if (inactiveUsers > 0)
+            statusMessage += `, 🔴 ${inactiveUsers} nieaktywnych`;
+          statusMessage += ")";
+
+          if (activeUsers === 0 && totalUsers > 0) {
+            showWarning(
+              "map-status",
+              statusMessage +
+                "<br><small>Brak aktywnych lokalizacji. Gracze mogą mieć wyłączoną geolokalizację.</small>"
+            );
+          } else {
+            showSuccess("map-status", statusMessage);
+          }
         } catch (error) {
           console.error("Błąd pobierania lokalizacji:", error);
           showError(
             "map-status",
             `Nie udało się pobrać lokalizacji: ${error.message}`
           );
+        } finally {
+          enableButton("refresh-locations-btn", "🔄 Odśwież lokalizacje");
         }
       }
 
       // TABELA CZASÓW
       async function fetchTimes() {
+        disableButton("refresh-times-btn", "🔄 Odświeżanie...");
         showLoading("times-status", "Pobieranie czasów wykonania...");
+
         try {
           const res = await fetch("/get_task_times");
           if (!res.ok) {
@@ -336,6 +486,16 @@
 
           const tbody = document.querySelector("#times-table tbody");
           tbody.innerHTML = "";
+
+          if (data.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="6" style="color: #cccccc; font-style: italic;">Brak danych o czasach wykonania zadań</td></tr>';
+            showWarning(
+              "times-status",
+              "Brak danych o czasach wykonania zadań"
+            );
+            return;
+          }
 
           data.forEach((row) => {
             const tr = document.createElement("tr");
@@ -353,26 +513,32 @@
               <td>${startDate}</td>
               <td>${endDate}</td>
               <td>${row.duration || "-"}</td>
-              <td>${filename}</td>
+              <td title="${filename}">${
+              filename.length > 20
+                ? filename.substring(0, 20) + "..."
+                : filename
+            }</td>
             `;
             tbody.appendChild(tr);
           });
 
-          document.getElementById(
-            "times-status"
-          ).innerHTML = `<div style="color: #00c853;">✅ Załadowano ${data.length} rekordów</div>`;
+          showSuccess("times-status", `Załadowano ${data.length} rekordów`);
         } catch (error) {
           console.error("Błąd pobierania czasów:", error);
           showError(
             "times-status",
             `Nie udało się pobrać czasów: ${error.message}`
           );
+        } finally {
+          enableButton("refresh-times-btn", "🔄 Odśwież czasy");
         }
       }
 
       // GALERIA
       async function fetchGallery() {
+        disableButton("refresh-gallery-btn", "🔄 Odświeżanie...");
         showLoading("gallery-status", "Pobieranie galerii...");
+
         try {
           const res = await fetch("/get_gallery");
           if (!res.ok) {
@@ -390,9 +556,7 @@
           if (data.length === 0) {
             container.innerHTML =
               '<div style="color: #cccccc; text-align: center; padding: 20px;">Brak zdjęć w galerii</div>';
-            document.getElementById(
-              "gallery-status"
-            ).innerHTML = `<div style="color: #ffa726;">⚠️ Galeria jest pusta</div>`;
+            showWarning("gallery-status", "Galeria jest pusta");
             return;
           }
 
@@ -462,15 +626,35 @@
             container.appendChild(div);
           });
 
-          document.getElementById(
-            "gallery-status"
-          ).innerHTML = `<div style="color: #00c853;">✅ Załadowano ${data.length} zdjęć</div>`;
+          showSuccess("gallery-status", `Załadowano ${data.length} zdjęć`);
         } catch (error) {
           console.error("Błąd pobierania galerii:", error);
           showError(
             "gallery-status",
             `Nie udało się pobrać galerii: ${error.message}`
           );
+        } finally {
+          enableButton("refresh-gallery-btn", "🔄 Odśwież galerię");
+        }
+      }
+
+      // DEBUG FUNKCJA
+      async function debugFiles() {
+        disableButton("debug-files-btn", "🔍 Debugowanie...");
+        try {
+          const res = await fetch("/debug_files");
+          const data = await res.json();
+
+          const debugDiv = document.getElementById("debug-info");
+          debugDiv.style.display = "block";
+          debugDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        } catch (error) {
+          console.error("Błąd debugowania:", error);
+          const debugDiv = document.getElementById("debug-info");
+          debugDiv.style.display = "block";
+          debugDiv.innerHTML = `<div class="error-message">Błąd debugowania: ${error.message}</div>`;
+        } finally {
+          enableButton("debug-files-btn", "🔍 Debug plików");
         }
       }
 
