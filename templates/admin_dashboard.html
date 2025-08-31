@@ -18,6 +18,296 @@
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
     <style>
+      /* Style dla menu hamburger */
+      .hamburger-menu {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+      }
+
+      .hamburger-icon {
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        background: rgba(40, 40, 55, 0.9);
+        border-radius: 8px;
+        padding: 8px;
+        transition: all 0.3s ease;
+      }
+
+      .hamburger-icon:hover {
+        background: rgba(60, 60, 75, 0.9);
+        transform: scale(1.05);
+      }
+
+      .hamburger-line {
+        width: 100%;
+        height: 3px;
+        background-color: #4f78ff;
+        border-radius: 2px;
+        transition: all 0.3s ease;
+      }
+
+      /* Overlay dla zamknięcia menu */
+      .menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        display: none;
+      }
+
+      /* Sidebar menu */
+      .menu-sidebar {
+        position: fixed;
+        top: 0;
+        left: -320px;
+        width: 320px;
+        height: 100%;
+        background: linear-gradient(135deg, #2b2b3d, #1e1e2f);
+        z-index: 1001;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 15px rgba(0, 0, 0, 0.4);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .menu-sidebar.open {
+        left: 0;
+      }
+
+      /* Header menu */
+      .menu-header {
+        padding: 25px 20px;
+        border-bottom: 2px solid #444;
+        color: #ffffff;
+        font-size: 1.3rem;
+        font-weight: bold;
+        text-align: center;
+        background: rgba(79, 120, 255, 0.1);
+      }
+
+      /* Elementy menu */
+      .menu-item {
+        padding: 18px 25px;
+        color: #cccccc;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-bottom: 1px solid #333;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 1.1rem;
+      }
+
+      .menu-item:hover {
+        background-color: rgba(79, 120, 255, 0.2);
+        color: #4f78ff;
+        padding-left: 30px;
+      }
+
+      .menu-item.active {
+        background-color: #4f78ff;
+        color: white;
+        border-left: 4px solid #ffffff;
+      }
+
+      /* Przycisk zamknięcia menu */
+      .menu-close {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        color: #cccccc;
+        cursor: pointer;
+        font-size: 24px;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+      }
+
+      .menu-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #4f78ff;
+      }
+
+      /* Główna zawartość z przesunięciem */
+      .main-content {
+        transition: margin-left 0.3s ease;
+      }
+
+      /* Style dla panelu ustawień */
+      .settings-section {
+        background: rgba(40, 40, 55, 0.9);
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .settings-section h3 {
+        color: #4f78ff;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #4f78ff;
+        padding-bottom: 8px;
+        font-size: 1.4rem;
+      }
+
+      /* Formularz użytkownika */
+      .user-editor {
+        margin-bottom: 15px;
+        padding: 20px;
+        background: #2b2b3d;
+        border-radius: 12px;
+        border: 1px solid #444;
+        transition: all 0.3s ease;
+      }
+
+      .user-editor:hover {
+        border-color: #4f78ff;
+        box-shadow: 0 0 10px rgba(79, 120, 255, 0.3);
+      }
+
+      .user-row {
+        display: grid;
+        grid-template-columns: 2fr 2fr 1.5fr 1fr;
+        gap: 15px;
+        align-items: center;
+      }
+
+      /* Formularz zadania */
+      .task-editor {
+        margin-bottom: 20px;
+        padding: 20px;
+        background: #2b2b3d;
+        border-radius: 12px;
+        border: 1px solid #444;
+        transition: all 0.3s ease;
+      }
+
+      .task-editor:hover {
+        border-color: #4f78ff;
+        box-shadow: 0 0 10px rgba(79, 120, 255, 0.3);
+      }
+
+      .task-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 15px;
+        align-items: start;
+      }
+
+      /* Pola formularza */
+      .form-input {
+        padding: 10px 12px;
+        border: none;
+        border-radius: 8px;
+        background: #1e1e2f;
+        color: #ffffff;
+        font-size: 14px;
+        transition: all 0.3s ease;
+      }
+
+      .form-input:focus {
+        outline: none;
+        background: #252540;
+        box-shadow: 0 0 8px rgba(79, 120, 255, 0.4);
+      }
+
+      .form-textarea {
+        min-height: 120px;
+        resize: vertical;
+        font-family: inherit;
+        line-height: 1.4;
+      }
+
+      .form-select {
+        padding: 10px 12px;
+        border: none;
+        border-radius: 8px;
+        background: #1e1e2f;
+        color: #ffffff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      /* Przyciski */
+      .btn-small {
+        padding: 8px 15px;
+        font-size: 13px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+      }
+
+      .btn-danger {
+        background-color: #ff4757;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background-color: #e84343;
+        transform: translateY(-1px);
+      }
+
+      .btn-success {
+        background-color: #2ed573;
+        color: white;
+      }
+
+      .btn-success:hover {
+        background-color: #26c066;
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background-color: #4f78ff;
+        color: white;
+        padding: 12px 25px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .btn-primary:hover {
+        background-color: #345ee0;
+        transform: translateY(-1px);
+      }
+
+      /* Główny przycisk zapisu */
+      .save-all-btn {
+        position: sticky;
+        bottom: 20px;
+        width: 100%;
+        padding: 18px;
+        font-size: 18px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #4f78ff, #345ee0);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(79, 120, 255, 0.4);
+        transition: all 0.3s ease;
+      }
+
+      .save-all-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(79, 120, 255, 0.5);
+      }
+
+      /* Style istniejące (bez zmian) */
       .fullscreen-img {
         position: fixed;
         top: 0;
@@ -173,118 +463,211 @@
       .marker-active {
         color: #00c853;
       }
-
       .marker-inactive {
         color: #ff6b6b;
       }
-
       .marker-old {
         color: #ffa726;
+      }
+
+      /* Responsywność */
+      @media (max-width: 768px) {
+        .user-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .task-row {
+          grid-template-columns: 1fr;
+        }
+
+        .menu-sidebar {
+          width: 280px;
+          left: -280px;
+        }
+
+        .hamburger-icon {
+          width: 35px;
+          height: 35px;
+          padding: 6px;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="dashboard-container">
-      <h1 class="dashboard-title">Witaj, {{ username }} (Admin)</h1>
-
-      <div class="dashboard-grid">
-        <div class="tile" onclick="showPanel('map-panel')">
-          <h2>🗺️ Mapa graczy</h2>
-        </div>
-        <div class="tile" onclick="showPanel('times-panel')">
-          <h2>⏱️ Czas wykonania zadań</h2>
-        </div>
-        <div class="tile" onclick="showPanel('gallery-panel')">
-          <h2>📷 Galeria zdjęć</h2>
-        </div>
+    <!-- Menu hamburger -->
+    <div class="hamburger-menu">
+      <div class="hamburger-icon" onclick="toggleMenu()">
+        <div class="hamburger-line"></div>
+        <div class="hamburger-line"></div>
+        <div class="hamburger-line"></div>
       </div>
-
-      <div class="content-panel">
-        <div id="map-panel" class="">
-          <button
-            class="refresh-btn"
-            onclick="fetchLocations()"
-            id="refresh-locations-btn"
-          >
-            🔄 Odśwież lokalizacje
-          </button>
-          <div class="map-stats">
-            <div class="map-stat">
-              <div class="marker-active">● Aktywny (< 5 min)</div>
-            </div>
-            <div class="map-stat">
-              <div class="marker-old">● Nieaktualny (5-30 min)</div>
-            </div>
-            <div class="map-stat">
-              <div class="marker-inactive">● Nieaktywny (> 30 min)</div>
-            </div>
-          </div>
-          <div id="map" style="height: 400px"></div>
-          <div id="map-status" class="loading">Ładowanie mapy...</div>
-        </div>
-
-        <div id="times-panel" class="hidden">
-          <button
-            class="refresh-btn"
-            onclick="fetchTimes()"
-            id="refresh-times-btn"
-          >
-            🔄 Odśwież czasy
-          </button>
-          <div id="times-status" class="loading">Ładowanie czasów...</div>
-          <table id="times-table">
-            <thead>
-              <tr>
-                <th>Gracz</th>
-                <th>Zadanie</th>
-                <th>Start</th>
-                <th>Koniec</th>
-                <th>Czas trwania</th>
-                <th>Plik</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <div id="gallery-panel" class="hidden">
-          <button
-            class="refresh-btn"
-            onclick="fetchGallery()"
-            id="refresh-gallery-btn"
-          >
-            🔄 Odśwież galerię
-          </button>
-          <button
-            class="refresh-btn"
-            onclick="debugFiles()"
-            style="background-color: #ffa726"
-            id="debug-files-btn"
-          >
-            🔍 Debug plików
-          </button>
-          <div id="gallery-status" class="loading">Ładowanie galerii...</div>
-          <div
-            id="debug-info"
-            style="
-              display: none;
-              background: #2b2b3d;
-              padding: 10px;
-              border-radius: 5px;
-              margin: 10px 0;
-              font-family: monospace;
-              font-size: 12px;
-            "
-          ></div>
-          <div class="gallery-grid" id="gallery-container"></div>
-        </div>
-      </div>
-
-      <button class="logout-button" onclick="window.location.href='/logout'">
-        Wyloguj
-      </button>
     </div>
 
+    <!-- Overlay do zamknięcia menu -->
+    <div class="menu-overlay" onclick="toggleMenu()"></div>
+
+    <!-- Sidebar menu -->
+    <div class="menu-sidebar" id="menu-sidebar">
+      <div class="menu-close" onclick="toggleMenu()">✕</div>
+      <div class="menu-header">Panel Admina</div>
+      <div class="menu-item active" onclick="showMainPanel()">
+        <span>🏠</span> Main
+      </div>
+      <div class="menu-item" onclick="showSettingsPanel()">
+        <span>⚙️</span> Settings
+      </div>
+      <div
+        class="menu-item"
+        onclick="logout()"
+        style="margin-top: auto; border-top: 2px solid #444"
+      >
+        <span>🚪</span> Wyloguj
+      </div>
+    </div>
+
+    <div class="main-content">
+      <!-- Panel główny (istniejący dashboard) -->
+      <div id="main-panel" class="dashboard-container">
+        <h1 class="dashboard-title">Witaj, {{ username }} (Admin)</h1>
+
+        <div class="dashboard-grid">
+          <div class="tile" onclick="showDashboardPanel('map-panel')">
+            <h2>🗺️ Mapa graczy</h2>
+          </div>
+          <div class="tile" onclick="showDashboardPanel('times-panel')">
+            <h2>⏱️ Czas wykonania zadań</h2>
+          </div>
+          <div class="tile" onclick="showDashboardPanel('gallery-panel')">
+            <h2>📷 Galeria zdjęć</h2>
+          </div>
+        </div>
+
+        <div class="content-panel">
+          <!-- Panel mapy -->
+          <div id="map-panel" class="">
+            <button
+              class="refresh-btn"
+              onclick="fetchLocations()"
+              id="refresh-locations-btn"
+            >
+              🔄 Odśwież lokalizacje
+            </button>
+            <div class="map-stats">
+              <div class="map-stat">
+                <div class="marker-active">● Aktywny (< 5 min)</div>
+              </div>
+              <div class="map-stat">
+                <div class="marker-old">● Nieaktualny (5-30 min)</div>
+              </div>
+              <div class="map-stat">
+                <div class="marker-inactive">● Nieaktywny (> 30 min)</div>
+              </div>
+            </div>
+            <div id="map" style="height: 400px"></div>
+            <div id="map-status" class="loading">Ładowanie mapy...</div>
+          </div>
+
+          <!-- Panel czasów -->
+          <div id="times-panel" class="hidden">
+            <button
+              class="refresh-btn"
+              onclick="fetchTimes()"
+              id="refresh-times-btn"
+            >
+              🔄 Odśwież czasy
+            </button>
+            <div id="times-status" class="loading">Ładowanie czasów...</div>
+            <table id="times-table">
+              <thead>
+                <tr>
+                  <th>Gracz</th>
+                  <th>Zadanie</th>
+                  <th>Start</th>
+                  <th>Koniec</th>
+                  <th>Czas trwania</th>
+                  <th>Plik</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <!-- Panel galerii -->
+          <div id="gallery-panel" class="hidden">
+            <button
+              class="refresh-btn"
+              onclick="fetchGallery()"
+              id="refresh-gallery-btn"
+            >
+              🔄 Odśwież galerię
+            </button>
+            <button
+              class="refresh-btn"
+              onclick="debugFiles()"
+              style="background-color: #ffa726"
+              id="debug-files-btn"
+            >
+              🔍 Debug plików
+            </button>
+            <div id="gallery-status" class="loading">Ładowanie galerii...</div>
+            <div
+              id="debug-info"
+              style="
+                display: none;
+                background: #2b2b3d;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 10px 0;
+                font-family: monospace;
+                font-size: 12px;
+              "
+            ></div>
+            <div class="gallery-grid" id="gallery-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel ustawień -->
+      <div id="settings-panel" class="dashboard-container hidden">
+        <h1 class="dashboard-title">Ustawienia systemu</h1>
+
+        <!-- Sekcja użytkowników -->
+        <div class="settings-section">
+          <h3>👥 Zarządzanie użytkownikami</h3>
+          <div id="users-container"></div>
+          <button
+            class="btn-success btn-small"
+            onclick="addNewUser()"
+            style="margin-top: 15px"
+          >
+            + Dodaj nowego użytkownika
+          </button>
+        </div>
+
+        <!-- Sekcja zadań -->
+        <div class="settings-section">
+          <h3>📝 Zarządzanie zadaniami</h3>
+          <div id="tasks-container"></div>
+          <button
+            class="btn-success btn-small"
+            onclick="addNewTask()"
+            style="margin-top: 15px"
+          >
+            + Dodaj nowe zadanie
+          </button>
+        </div>
+
+        <!-- Przycisk zapisania wszystkich zmian -->
+        <button class="save-all-btn" onclick="saveAllSettings()">
+          💾 Zapisz wszystkie zmiany
+        </button>
+
+        <div id="settings-status"></div>
+      </div>
+    </div>
+
+    <!-- Modal do powiększania zdjęć -->
     <div
       class="fullscreen-img hidden"
       id="fullscreen-img"
@@ -295,13 +678,80 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      function showPanel(id) {
+      // === ZMIENNE GLOBALNE ===
+      let isMenuOpen = false;
+      let currentUsers = {};
+      let currentTasks = {};
+      let markers = {};
+
+      // === OBSŁUGA MENU HAMBURGER ===
+      function toggleMenu() {
+        const sidebar = document.getElementById("menu-sidebar");
+        const overlay = document.querySelector(".menu-overlay");
+        const mainContent = document.querySelector(".main-content");
+
+        isMenuOpen = !isMenuOpen;
+
+        if (isMenuOpen) {
+          sidebar.classList.add("open");
+          overlay.style.display = "block";
+          if (window.innerWidth > 768) {
+            mainContent.style.marginLeft = "320px";
+          }
+        } else {
+          sidebar.classList.remove("open");
+          overlay.style.display = "none";
+          mainContent.style.marginLeft = "0";
+        }
+      }
+
+      // Przełączanie na panel główny
+      function showMainPanel() {
+        document.getElementById("main-panel").classList.remove("hidden");
+        document.getElementById("settings-panel").classList.add("hidden");
+        updateActiveMenuItem(0);
+
+        if (window.innerWidth <= 768) toggleMenu();
+
+        setTimeout(() => {
+          if (
+            map &&
+            !document.getElementById("map-panel").classList.contains("hidden")
+          ) {
+            map.invalidateSize();
+          }
+        }, 100);
+      }
+
+      // Przełączanie na panel ustawień
+      function showSettingsPanel() {
+        document.getElementById("main-panel").classList.add("hidden");
+        document.getElementById("settings-panel").classList.remove("hidden");
+        updateActiveMenuItem(1);
+
+        if (window.innerWidth <= 768) toggleMenu();
+        loadSettings();
+      }
+
+      // Aktualizuje aktywny element menu
+      function updateActiveMenuItem(index) {
+        document
+          .querySelectorAll(".menu-item")
+          .forEach((item) => item.classList.remove("active"));
+        document.querySelectorAll(".menu-item")[index].classList.add("active");
+      }
+
+      function logout() {
+        window.location.href = "/logout";
+      }
+
+      // === OBSŁUGA PANELI DASHBOARD (MAPA, CZASY, GALERIA) ===
+      function showDashboardPanel(id) {
         ["map-panel", "times-panel", "gallery-panel"].forEach((p) =>
           document.getElementById(p).classList.add("hidden")
         );
         document.getElementById(id).classList.remove("hidden");
 
-        // Odśwież dane po przełączeniu panelu
         if (id === "map-panel") {
           setTimeout(() => {
             if (map) map.invalidateSize();
@@ -309,6 +759,7 @@
         }
       }
 
+      // === FUNKCJE POMOCNICZE DLA KOMUNIKATÓW ===
       function showError(elementId, message) {
         const element = document.getElementById(elementId);
         element.innerHTML = `<div class="error-message">❌ ${message}</div>`;
@@ -345,13 +796,12 @@
         }
       }
 
-      // MAPA
-      const map = L.map("map").setView([50.0647, 19.945], 12); // Kraków jako domyślna lokalizacja
+      // === MAPA - FUNKCJE LOKALIZACJI ===
+      const map = L.map("map").setView([50.0647, 19.945], 12);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
         attribution: "© OpenStreetMap contributors",
       }).addTo(map);
-      let markers = {};
 
       function getMarkerColor(minutesAgo) {
         if (minutesAgo < 5) return "green";
@@ -382,7 +832,7 @@
             throw new Error(data.error);
           }
 
-          // Usuń nieistniejących użytkowników
+          // Usuń nieistniejących użytkowników z mapy
           for (const user in markers) {
             if (!data[user]) {
               map.removeLayer(markers[user]);
@@ -390,7 +840,6 @@
             }
           }
 
-          // Dodaj/zaktualizuj markery
           let activeUsers = 0;
           let inactiveUsers = 0;
           let oldUsers = 0;
@@ -404,13 +853,13 @@
             return;
           }
 
+          // Dodaj/zaktualizuj markery na mapie
           for (const [username, loc] of Object.entries(data)) {
             const latlng = [loc.latitude, loc.longitude];
             const lastUpdate = new Date(loc.last_update);
             const timeAgo = Math.round((new Date() - lastUpdate) / 1000 / 60);
             const color = getMarkerColor(timeAgo);
 
-            // Klasyfikuj użytkowników
             if (timeAgo < 5) activeUsers++;
             else if (timeAgo < 30) oldUsers++;
             else inactiveUsers++;
@@ -468,7 +917,7 @@
         }
       }
 
-      // TABELA CZASÓW
+      // === TABELA CZASÓW WYKONANIA ===
       async function fetchTimes() {
         disableButton("refresh-times-btn", "🔄 Odświeżanie...");
         showLoading("times-status", "Pobieranie czasów wykonania...");
@@ -534,7 +983,7 @@
         }
       }
 
-      // GALERIA
+      // === GALERIA ZDJĘĆ ===
       async function fetchGallery() {
         disableButton("refresh-gallery-btn", "🔄 Odświeżanie...");
         showLoading("gallery-status", "Pobieranie galerii...");
@@ -566,13 +1015,13 @@
 
             const img = document.createElement("img");
 
-            // Testuj różne URL-e w kolejności preferencji
+            // Testuj różne URL-e dla obrazów
             const urlsToTry = [
-              item.image_url, // Custom endpoint
-              item.static_url, // Flask static
-              item.direct_path, // Direct static path
-              `/uploads/solutions/${item.username}/${item.filename}`, // Fallback
-            ].filter((url) => url); // Usuń puste URL-e
+              item.image_url,
+              item.static_url,
+              item.direct_path,
+              `/uploads/solutions/${item.username}/${item.filename}`,
+            ].filter((url) => url);
 
             let urlIndex = 0;
 
@@ -599,7 +1048,6 @@
               console.log("Obraz załadowany pomyślnie:", this.src);
             };
 
-            // Rozpocznij ładowanie
             tryNextUrl();
 
             img.onclick = () => {
@@ -638,7 +1086,7 @@
         }
       }
 
-      // DEBUG FUNKCJA
+      // === DEBUG FUNKCJA ===
       async function debugFiles() {
         disableButton("debug-files-btn", "🔍 Debugowanie...");
         try {
@@ -658,13 +1106,245 @@
         }
       }
 
-      // Inicjalizacja
+      // === USTAWIENIA - ZARZĄDZANIE UŻYTKOWNIKAMI I ZADANIAMI ===
+      async function loadSettings() {
+        showLoading("settings-status", "Ładowanie ustawień...");
+
+        try {
+          // Załaduj użytkowników
+          const usersRes = await fetch("/api/users");
+          if (usersRes.ok) {
+            currentUsers = await usersRes.json();
+            renderUsers();
+          } else {
+            throw new Error("Błąd pobierania użytkowników");
+          }
+
+          // Załaduj zadania
+          const tasksRes = await fetch("/api/tasks");
+          if (tasksRes.ok) {
+            currentTasks = await tasksRes.json();
+            renderTasks();
+          } else {
+            throw new Error("Błąd pobierania zadań");
+          }
+
+          showSuccess("settings-status", "Ustawienia załadowane pomyślnie");
+        } catch (error) {
+          console.error("Błąd ładowania ustawień:", error);
+          showError(
+            "settings-status",
+            `Nie udało się załadować ustawień: ${error.message}`
+          );
+        }
+      }
+
+      // Renderuje formularz edycji użytkowników
+      function renderUsers() {
+        const container = document.getElementById("users-container");
+        container.innerHTML = "";
+
+        Object.entries(currentUsers).forEach(([username, userData]) => {
+          const userDiv = document.createElement("div");
+          userDiv.className = "user-editor";
+          userDiv.innerHTML = `
+            <div class="user-row">
+              <input type="text" class="form-input" value="${username}" 
+                     onchange="updateUserField('${username}', 'username', this.value)" 
+                     placeholder="Nazwa użytkownika">
+              <input type="password" class="form-input" value="${
+                userData.password
+              }" 
+                     onchange="updateUserField('${username}', 'password', this.value)" 
+                     placeholder="Hasło">
+              <select class="form-select" onchange="updateUserField('${username}', 'role', this.value)">
+                <option value="player" ${
+                  userData.role === "player" ? "selected" : ""
+                }>Gracz</option>
+                <option value="admin" ${
+                  userData.role === "admin" ? "selected" : ""
+                }>Admin</option>
+              </select>
+              <button class="btn-danger btn-small" onclick="deleteUser('${username}')">Usuń</button>
+            </div>
+          `;
+          container.appendChild(userDiv);
+        });
+      }
+
+      // Renderuje formularz edycji zadań
+      function renderTasks() {
+        const container = document.getElementById("tasks-container");
+        container.innerHTML = "";
+
+        Object.entries(currentTasks).forEach(([taskId, content]) => {
+          const taskDiv = document.createElement("div");
+          taskDiv.className = "task-editor";
+          taskDiv.innerHTML = `
+            <div class="task-row">
+              <textarea class="form-input form-textarea" 
+                        onchange="updateTaskContent('${taskId}', this.value)" 
+                        placeholder="Treść zadania">${content}</textarea>
+              <div>
+                <div style="margin-bottom: 10px;">
+                  <small style="color: #888; word-break: break-all;">ID: ${taskId}</small>
+                </div>
+                <button class="btn-danger btn-small" onclick="deleteTask('${taskId}')">Usuń zadanie</button>
+              </div>
+            </div>
+          `;
+          container.appendChild(taskDiv);
+        });
+      }
+
+      // Aktualizuje pole użytkownika
+      function updateUserField(oldUsername, field, newValue) {
+        if (field === "username") {
+          // Zmiana nazwy użytkownika
+          if (newValue && newValue !== oldUsername && newValue.trim()) {
+            const trimmedValue = newValue.trim();
+            if (currentUsers[trimmedValue]) {
+              alert("Użytkownik o tej nazwie już istnieje!");
+              renderUsers();
+              return;
+            }
+            currentUsers[trimmedValue] = currentUsers[oldUsername];
+            delete currentUsers[oldUsername];
+            renderUsers();
+          }
+        } else {
+          // Zmiana hasła lub roli
+          if (currentUsers[oldUsername]) {
+            currentUsers[oldUsername][field] = newValue;
+          }
+        }
+      }
+
+      // Aktualizuje treść zadania
+      function updateTaskContent(taskId, newContent) {
+        currentTasks[taskId] = newContent;
+      }
+
+      // Dodaje nowego użytkownika
+      function addNewUser() {
+        const newUsername = prompt("Podaj nazwę nowego użytkownika:");
+        if (newUsername && newUsername.trim()) {
+          const username = newUsername.trim();
+          if (currentUsers[username]) {
+            alert("Użytkownik o tej nazwie już istnieje!");
+            return;
+          }
+
+          currentUsers[username] = {
+            password: "haslo123",
+            role: "player",
+          };
+
+          renderUsers();
+        }
+      }
+
+      // Dodaje nowe zadanie
+      function addNewTask() {
+        const taskId = generateTaskId();
+        currentTasks[taskId] = "Nowe zadanie - wpisz treść tutaj...";
+        renderTasks();
+      }
+
+      // Generuje losowe ID zadania (25 znaków)
+      function generateTaskId() {
+        const chars =
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        let result = "";
+        for (let i = 0; i < 25; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      }
+
+      // Usuwa użytkownika
+      function deleteUser(username) {
+        if (confirm(`Czy na pewno chcesz usunąć użytkownika "${username}"?`)) {
+          // Sprawdź czy to nie ostatni admin
+          const remainingAdmins = Object.values(currentUsers).filter(
+            (u) => u.role === "admin"
+          ).length;
+          if (currentUsers[username].role === "admin" && remainingAdmins <= 1) {
+            alert("Nie można usunąć ostatniego administratora!");
+            return;
+          }
+
+          delete currentUsers[username];
+          renderUsers();
+        }
+      }
+
+      // Usuwa zadanie
+      function deleteTask(taskId) {
+        if (confirm(`Czy na pewno chcesz usunąć to zadanie?`)) {
+          delete currentTasks[taskId];
+          renderTasks();
+        }
+      }
+
+      // Zapisuje wszystkie zmiany w ustawieniach
+      async function saveAllSettings() {
+        const saveBtn = document.querySelector(".save-all-btn");
+        const originalText = saveBtn.textContent;
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "💾 Zapisywanie...";
+        showLoading("settings-status", "Zapisywanie zmian...");
+
+        try {
+          // Zapisz użytkowników
+          const usersRes = await fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(currentUsers),
+          });
+
+          if (!usersRes.ok) {
+            const error = await usersRes.json();
+            throw new Error(error.error || "Błąd zapisu użytkowników");
+          }
+
+          // Zapisz zadania
+          const tasksRes = await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(currentTasks),
+          });
+
+          if (!tasksRes.ok) {
+            const error = await tasksRes.json();
+            throw new Error(error.error || "Błąd zapisu zadań");
+          }
+
+          showSuccess(
+            "settings-status",
+            "Wszystkie zmiany zostały zapisane pomyślnie!"
+          );
+        } catch (error) {
+          console.error("Błąd zapisu ustawień:", error);
+          showError(
+            "settings-status",
+            `Nie udało się zapisać: ${error.message}`
+          );
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalText;
+        }
+      }
+
+      // === INICJALIZACJA APLIKACJI ===
       document.addEventListener("DOMContentLoaded", function () {
+        // Załaduj dane głównego panelu
         fetchLocations();
         fetchTimes();
         fetchGallery();
 
-        // Auto-refresh co 30 sekund
+        // Auto-refresh co 30 sekund dla aktywnych paneli
         setInterval(() => {
           if (
             !document.getElementById("map-panel").classList.contains("hidden")
@@ -679,10 +1359,13 @@
         }, 30000);
       });
 
-      // Obsługa klawiszy
+      // Obsługa klawisza ESC do zamykania modal i menu
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape") {
           document.getElementById("fullscreen-img").classList.add("hidden");
+          if (isMenuOpen) {
+            toggleMenu();
+          }
         }
       });
     </script>

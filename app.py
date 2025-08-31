@@ -3,8 +3,6 @@ import os
 import json
 from dotenv import load_dotenv
 from datetime import datetime
-from users import USERS
-from tasks import TASKS
 from werkzeug.utils import secure_filename
 import hashlib
 
@@ -15,6 +13,8 @@ TASK_TIMES_FILE = os.path.join(DATA_DIR, 'task_times.json')
 SOLUTIONS_FILE = os.path.join(DATA_DIR, 'zadania_rozwiazania.json')
 LOCATIONS_FILE = os.path.join(DATA_DIR, 'players_location.json')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads', 'solutions')  # Zawsze w folderze projektu
+USERS_FILE = os.path.join(DATA_DIR, 'users.json')
+TASKS_FILE = os.path.join(DATA_DIR, 'tasks.json')
 
 # Tworzenie folderów
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -30,7 +30,7 @@ print(f"Upload folder exists: {os.path.exists(UPLOAD_FOLDER)}")
 print("==============================")
 
 # Dozwolone rozszerzenia plików
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'raw'}
 
 load_dotenv()
 
@@ -64,7 +64,32 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def initialize_data_files():
+    """Inicjalizuje pliki JSON z danych z plików .py (tylko przy pierwszym uruchomieniu)"""
+    # Inicjalizuj użytkowników
+    if not os.path.exists(USERS_FILE):
+        from users import USERS as DEFAULT_USERS
+        print("Tworzę plik users.json z danych z users.py")
+        save_json_file(USERS_FILE, DEFAULT_USERS)
+    
+    # Inicjalizuj zadania
+    if not os.path.exists(TASKS_FILE):
+        from tasks import TASKS as DEFAULT_TASKS
+        print("Tworzę plik tasks.json z danych z tasks.py")
+        save_json_file(TASKS_FILE, DEFAULT_TASKS)
+
+def load_current_users():
+    """Ładuje aktualnych użytkowników z pliku JSON"""
+    return load_json_file(USERS_FILE, {})
+
+def load_current_tasks():
+    """Ładuje aktualne zadania z pliku JSON"""
+    return load_json_file(TASKS_FILE, {})
+
 # Ładowanie danych przy starcie
+initialize_data_files()
+CURRENT_USERS = load_current_users()
+CURRENT_TASKS = load_current_tasks()
 task_times = load_json_file(TASK_TIMES_FILE, [])
 zadania_rozwiazania = load_json_file(SOLUTIONS_FILE, {})
 players_location = load_json_file(LOCATIONS_FILE, {})
@@ -85,7 +110,7 @@ def login():
         if not username or not password:
             return render_template("login.html", error="Proszę podać nazwę użytkownika i hasło")
 
-        user = USERS.get(username)
+        user = CURRENT_USERS.get(username)
         if user and user["password"] == password:
             session["username"] = username
             session["role"] = user["role"]
@@ -205,7 +230,7 @@ def pokaz_zadanie(task_id):
     if not username:
         return redirect(url_for("login"))
     
-    if task_id not in TASKS:
+    if task_id not in CURRENT_TASKS:
         return redirect(url_for("player_dashboard"))
 
     # Sprawdź czy użytkownik już rozwiązał to zadanie
@@ -228,7 +253,7 @@ def pokaz_zadanie(task_id):
     end_time = zadania_czasy[username][task_id]["end"]
     end_time_iso = end_time.isoformat() if end_time else None
 
-    tresc = TASKS[task_id]
+    tresc = CURRENT_TASKS[task_id]
     return render_template("zadanie.html", 
                          task_id=task_id, 
                          tresc=tresc, 
@@ -254,7 +279,7 @@ def upload_solution(task_id):
     if not username:
         return jsonify({"error": "Unauthorized"}), 401
 
-    if task_id not in TASKS:
+    if task_id not in CURRENT_TASKS:
         return jsonify({"error": "Nieprawidłowe zadanie"}), 400
 
     try:
@@ -509,6 +534,94 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return render_template('login.html', error="Wystąpił błąd serwera"), 500
+
+@app.route("/api/users", methods=["GET"])
+def get_users():
+    """Pobiera listę użytkowników dla panelu Settings"""
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    # Zwraca użytkowników z hasłami (do edycji)
+    return jsonify(CURRENT_USERS)
+
+@app.route("/api/users", methods=["POST"])
+def update_users():
+    """Zapisuje zaktualizowanych użytkowników"""
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Brak danych"}), 400
+        
+        # Walidacja - każdy użytkownik musi mieć login, hasło i rolę
+        for username, user_data in data.items():
+            if not username.strip():
+                return jsonify({"error": "Nazwa użytkownika nie może być pusta"}), 400
+            if not user_data.get("password", "").strip():
+                return jsonify({"error": f"Hasło dla użytkownika '{username}' nie może być puste"}), 400
+            if user_data.get("role") not in ["admin", "player"]:
+                return jsonify({"error": f"Nieprawidłowa rola dla użytkownika '{username}'"}), 400
+        
+        # Sprawdź czy pozostaje przynajmniej jeden admin
+        admin_count = sum(1 for user in data.values() if user.get("role") == "admin")
+        if admin_count == 0:
+            return jsonify({"error": "Musi pozostać przynajmniej jeden administrator"}), 400
+        
+        # Aktualizuj globalne dane
+        global CURRENT_USERS
+        CURRENT_USERS = data.copy()
+        
+        # Zapisz do pliku
+        if save_json_file(USERS_FILE, CURRENT_USERS):
+            return jsonify({"status": "success", "message": f"Zaktualizowano {len(data)} użytkowników"})
+        else:
+            return jsonify({"error": "Błąd zapisu pliku użytkowników"}), 500
+            
+    except Exception as e:
+        print(f"Błąd aktualizacji użytkowników: {e}")
+        return jsonify({"error": f"Wewnętrzny błąd serwera: {str(e)}"}), 500
+
+@app.route("/api/tasks", methods=["GET"])
+def get_tasks():
+    """Pobiera listę zadań dla panelu Settings"""
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    return jsonify(CURRENT_TASKS)
+
+@app.route("/api/tasks", methods=["POST"])
+def update_tasks():
+    """Zapisuje zaktualizowane zadania"""
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Brak danych"}), 400
+        
+        # Walidacja - każde zadanie musi mieć ID i treść
+        for task_id, content in data.items():
+            if not task_id.strip():
+                return jsonify({"error": "ID zadania nie może być puste"}), 400
+            if not content.strip():
+                return jsonify({"error": f"Treść zadania '{task_id}' nie może być pusta"}), 400
+        
+        # Aktualizuj globalne dane
+        global CURRENT_TASKS
+        CURRENT_TASKS = data.copy()
+        
+        # Zapisz do pliku
+        if save_json_file(TASKS_FILE, CURRENT_TASKS):
+            return jsonify({"status": "success", "message": f"Zaktualizowano {len(data)} zadań"})
+        else:
+            return jsonify({"error": "Błąd zapisu pliku zadań"}), 500
+            
+    except Exception as e:
+        print(f"Błąd aktualizacji zadań: {e}")
+        return jsonify({"error": f"Wewnętrzny błąd serwera: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
